@@ -8,7 +8,7 @@ class Config:
     """Base configuration."""
     
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'postgresql://localhost/crossword_db')
+    SQLALCHEMY_DATABASE_URI = os.getenv('CROSSWORD_DATABASE_URL').replace("postgres://", "postgresql://") or 'invalid_db_uri'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # API Configuration
@@ -37,7 +37,7 @@ class ProductionConfig(Config):
 class TestingConfig(Config):
     """Testing configuration."""
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = 'postgresql://localhost/crossword_test_db'
+    SQLALCHEMY_DATABASE_URI = os.getenv('CROSSWORD_DATABASE_URL').replace("postgres://", "postgresql://") or 'invalid_db_uri'
 
 
 config = {
