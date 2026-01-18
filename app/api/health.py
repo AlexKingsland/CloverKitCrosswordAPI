@@ -7,7 +7,7 @@ from app import db
 def health_check():
     """Health check endpoint."""
     try:
-        # Test database connection
+        # Test database connectivity
         db.session.execute(db.text('SELECT 1'))
         db_status = 'healthy'
     except Exception as e:
