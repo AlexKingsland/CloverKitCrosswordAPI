@@ -107,8 +107,7 @@ def upload_file_to_r2(s3_client, local_file: Path, bucket: str, key: str) -> boo
             key,
             ExtraArgs={
                 'ContentType': 'application/json; charset=utf-8',
-                'CacheControl': 'public, max-age=31536000, immutable',
-                'ACL': 'public-read'  # Make file publicly accessible
+                'CacheControl': 'public, max-age=31536000, s-maxage=31536000, immutable',
             }
         )
         return True
