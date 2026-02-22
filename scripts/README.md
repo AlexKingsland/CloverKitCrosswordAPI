@@ -38,25 +38,42 @@ crossword/
 
 ### 1. generate_crosswords.py
 
-Generates daily crossword puzzle JSON files for all three difficulty levels.
+Generates runtime crossword JSON files from a CSV puzzle definition source.
 
 **Usage:**
 ```bash
-python scripts/generate_crosswords.py --start-date 2026-02-01 --days 30
+python scripts/generate_crosswords.py --csv-path /absolute/path/to/puzzles.csv
 ```
 
 **Arguments:**
-- `--start-date`: Start date in YYYY-MM-DD format (required)
-- `--days`: Number of days to generate (required)
+- `--csv-path`: Path to a single puzzle CSV file
+- `--csv-dir`: Path to a directory of CSV files (each file = one puzzle)
+- `--start-date`: Start date (`YYYY-MM-DD`) used to assign sequential output dates in `--csv-dir` mode (default: today)
+- `--recursive`: Recursively search subdirectories for CSVs when using `--csv-dir`
 - `--output-dir`: Output directory (default: `out`)
+- `--default-difficulty`: Fallback difficulty when CSV does not specify one (`easy|medium|hard`, default: `medium`)
+
+> Note: Use either `--csv-path` or `--csv-dir` (mutually exclusive).
 
 **Output:**
-Creates JSON files in `out/v1/generic/{difficulty}/{date}.json` format.
+Creates JSON files in `out/v1/generic/{difficulty}/{date}.json` format using the same runtime contract expected by CloverKitCrossword frontend:
+- `acrossClues`
+- `downClues`
+- `answers`
+- `cluePositions`
 
 **Example:**
 ```bash
-# Generate puzzles for February 2026
-python scripts/generate_crosswords.py --start-date 2026-02-01 --days 28
+python scripts/generate_crosswords.py \
+  --csv-path /Users/alexkingsland/Downloads/puzzles.csv \
+  --output-dir out
+
+# Directory mode: one <date>.json per CSV, date index starts at --start-date
+python scripts/generate_crosswords.py \
+  --csv-dir /Users/alexkingsland/Downloads/puzzles-batch \
+  --recursive \
+  --start-date 2026-03-01 \
+  --output-dir out
 ```
 
 ### 2. upload_to_r2.py
@@ -126,16 +143,22 @@ python scripts/upload_to_r2.py
      ]
      ```
 
-### Monthly Puzzle Generation
+### Puzzle Generation from CSV
 
-Generate and upload puzzles for the upcoming month:
+Generate and upload puzzles from CSV source data:
 
 ```bash
-# Generate puzzles for March 2026
-python scripts/generate_crosswords.py --start-date 2026-03-01 --days 31
+# Generate runtime JSON from CSV
+python scripts/generate_crosswords.py --csv-path /path/to/puzzles.csv --output-dir out
+
+# Directory mode (sequential date indexing, defaults to today if omitted)
+python scripts/generate_crosswords.py --csv-dir /path/to/puzzle-csvs --output-dir out
+
+# Recursive directory mode (scan nested folders)
+python scripts/generate_crosswords.py --csv-dir /path/to/puzzle-csvs --recursive --start-date 2026-03-01 --output-dir out
 
 # Review generated files
-ls -lh out/v1/generic/*/2026-03-*.json
+find out/v1/generic -name '*.json'
 
 # Upload to R2
 python scripts/upload_to_r2.py
@@ -143,18 +166,17 @@ python scripts/upload_to_r2.py
 
 ### Automation (Optional)
 
-Create a monthly cron job or GitHub Action:
+Create a scheduled job or GitHub Action that points at your latest CSV source:
 
 ```bash
 #!/bin/bash
-# monthly_puzzle_generation.sh
+# csv_puzzle_generation.sh
 
-# Calculate next month's date range
-START_DATE=$(date -d "next month" +%Y-%m-01)
-DAYS=$(date -d "$START_DATE + 1 month - 1 day" +%d)
+CSV_DIR=/path/to/puzzle-csvs
+START_DATE=2026-03-01
 
-# Generate puzzles
-python scripts/generate_crosswords.py --start-date $START_DATE --days $DAYS
+# Generate runtime JSON from CSV
+python scripts/generate_crosswords.py --csv-dir "$CSV_DIR" --recursive --start-date "$START_DATE" --output-dir out
 
 # Upload to R2
 python scripts/upload_to_r2.py
@@ -262,5 +284,7 @@ Update bucket CORS configuration in Cloudflare dashboard:
 
 - Puzzles are cached with `max-age=31536000` (1 year) since they're immutable
 - UTC dates are used to ensure consistency across timezones
-- The same puzzle template is used for all dates in a difficulty level (for testing)
-- Future enhancement: Generate unique puzzles using AI or puzzle API
+- CSV is now the authoring/source format, JSON is the runtime delivery format
+- Duplicate clue numbers are supported by disambiguating JSON keys (e.g. `14A`, `14D`)
+- In `--csv-dir` mode, files are sorted alphabetically and assigned dates sequentially from `--start-date`
+- In recursive mode, sorting uses each CSV's relative path from the top-level `--csv-dir`
