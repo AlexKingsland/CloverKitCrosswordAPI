@@ -17,6 +17,7 @@ import argparse
 import csv
 import json
 import re
+import unicodedata
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -24,6 +25,22 @@ from typing import Dict, List, Optional, Tuple
 
 
 VALID_DIFFICULTIES = {"easy", "medium", "hard"}
+
+
+def extract_difficulty_token(value: str) -> Optional[str]:
+    """Extract difficulty token from plain text or lightweight HTML content."""
+    normalized = normalize_text(value).lower()
+    if not normalized:
+        return None
+
+    # Strip simple HTML tags (e.g., <div>Medium</div>) before tokenizing.
+    normalized = re.sub(r"<[^>]+>", " ", normalized)
+    tokenized = re.split(r"[\s,;|:_\-\/]+", normalized)
+    for token in tokenized:
+        if token in VALID_DIFFICULTIES:
+            return token
+
+    return None
 
 
 def normalize_text(value: str) -> str:
@@ -44,6 +61,17 @@ def parse_int(value: str, field_name: str) -> int:
         return int(normalize_text(value))
     except Exception as exc:
         raise ValueError(f"Invalid integer for {field_name}: {value!r}") from exc
+
+
+def normalize_answer_text(value: str) -> str:
+    """Normalize answer text to uppercase ASCII letters by stripping diacritics."""
+    raw = normalize_text(value)
+    if not raw:
+        return ""
+
+    decomposed = unicodedata.normalize("NFKD", raw)
+    stripped = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return stripped.upper()
 
 
 def parse_publish_date(value: str) -> str:
@@ -76,17 +104,18 @@ def parse_publish_date(value: str) -> str:
 
 
 def infer_difficulty(row: Dict[str, str], default_difficulty: str) -> str:
-    # Priority: Difficulty column -> tags containing easy/medium/hard -> default
-    explicit = normalize_text(row.get("Difficulty", "")).lower()
-    if explicit in VALID_DIFFICULTIES:
+    # Priority: Difficulty column -> Tags -> Start Message -> default
+    explicit = extract_difficulty_token(row.get("Difficulty", ""))
+    if explicit:
         return explicit
 
-    tags = normalize_text(row.get("Tags", "")).lower()
+    tags = extract_difficulty_token(row.get("Tags", ""))
     if tags:
-        tokenized = re.split(r"[\s,;|]+", tags)
-        for token in tokenized:
-            if token in VALID_DIFFICULTIES:
-                return token
+        return tags
+
+    start_message = extract_difficulty_token(row.get("Start Message", ""))
+    if start_message:
+        return start_message
 
     return default_difficulty
 
@@ -195,7 +224,7 @@ def build_puzzle_payload(
                     f"Row {row_num}: Publish Time date {row_date_str} does not match puzzle date {date_str}"
                 )
 
-        answer = normalize_text(row.get("Answer", "")).upper()
+        answer = normalize_answer_text(row.get("Answer", ""))
         if not answer:
             raise ValueError(f"Row {row_num}: Answer is required")
         if not re.fullmatch(r"[A-Z]+", answer):
