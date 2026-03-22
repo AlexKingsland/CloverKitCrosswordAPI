@@ -1,0 +1,15 @@
+{
+  "name": "crossword-pipeline",
+  "version": "1.0.0",
+  "description": "Playwright-based crossword puzzle generation pipeline",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "pipeline": "node run_pipeline.js",
+    "playwright:install": "npx playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.5.0"
+  }
+}

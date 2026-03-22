@@ -49,9 +49,9 @@ def normalize_text(value: str) -> str:
 
 def parse_bool(value: str) -> bool:
     normalized = normalize_text(value).lower()
-    if normalized in {"true", "1", "yes", "y"}:
+    if normalized in {"true", "1", "yes", "y", "across"}:
         return True
-    if normalized in {"false", "0", "no", "n"}:
+    if normalized in {"false", "0", "no", "n", "down"}:
         return False
     raise ValueError(f"Invalid boolean value for Across Clue: {value!r}")
 
@@ -227,8 +227,8 @@ def build_puzzle_payload(
         answer = normalize_answer_text(row.get("Answer", ""))
         if not answer:
             raise ValueError(f"Row {row_num}: Answer is required")
-        if not re.fullmatch(r"[A-Z]+", answer):
-            raise ValueError(f"Row {row_num}: Answer must contain only letters A-Z: {answer!r}")
+        if not re.fullmatch(r"[A-Z0-9]+", answer):
+            raise ValueError(f"Row {row_num}: Answer must contain only letters A-Z or digits 0-9: {answer!r}")
 
         clue_text = normalize_text(row.get("Clue", "")) or normalize_text(row.get("Question Text", ""))
         if not clue_text:
@@ -423,8 +423,17 @@ def main():
             for row in rows:
                 puzzle_id = normalize_text(row.get("Puzzle ID", ""))
                 if not puzzle_id:
-                    print(f"❌ {csv_file.name} row {row['_row_number']}: Puzzle ID is required")
-                    return 1
+                    # Auto-generate puzzle ID from title or filename in csv-dir mode
+                    title = normalize_text(row.get("Title", ""))
+                    if title:
+                        puzzle_id = re.sub(r"[^\w\s-]", "", title.lower().strip())
+                        puzzle_id = re.sub(r"[\s_]+", "-", puzzle_id).strip("-") or csv_file.stem
+                    else:
+                        puzzle_id = csv_file.stem
+                    # Back-fill all rows with the generated ID
+                    for r in rows:
+                        if not normalize_text(r.get("Puzzle ID", "")):
+                            r["Puzzle ID"] = puzzle_id
                 grouped_rows[puzzle_id].append(row)
 
             if len(grouped_rows) != 1:
@@ -440,10 +449,18 @@ def main():
             folder_date_offsets[folder_key] = folder_offset + 1
             puzzle_id, puzzle_rows = next(iter(grouped_rows.items()))
 
+            # Infer difficulty from parent folder name (e.g., easy/, medium/, hard/)
+            parent_folder_name = csv_file.parent.name.lower()
+            folder_difficulty = (
+                parent_folder_name
+                if parent_folder_name in VALID_DIFFICULTIES
+                else args.default_difficulty
+            )
+
             try:
                 compiled = build_puzzle_payload(
                     puzzle_rows,
-                    args.default_difficulty,
+                    folder_difficulty,
                     forced_date=assigned_date,
                     validate_source_dates=False,
                 )

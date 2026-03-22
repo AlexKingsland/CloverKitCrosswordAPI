@@ -1,0 +1,14 @@
+# Crossword Puzzle Prompts
+# Format: Title, Topic
+# Lines starting with # are comments and will be skipped
+#
+# Example:
+# Space Exploration, Space
+# Ocean Life, Ocean
+# Ancient Egypt, Egypt
+
+Tech Startups, Technology
+Global Cuisines, Food
+Famous Golf Courses, Golf
+American Road Trip, Travel
+Startup Buzzwords, Business
